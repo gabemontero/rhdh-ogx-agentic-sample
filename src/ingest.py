@@ -72,16 +72,20 @@ class IngestionService:
         self.client = self._initialize_ogx_client()
         self.vector_store_ids: "list[str]" = []
 
-        # Vector DB setup
-        _embedding_dimension = (
-            _config["vector_db"].get("embedding_dimension")
-            if _config["vector_db"].get("embedding_dimension")
-            else DEFAULT_EMBEDDING_DIMENSION
+        # Environment overrides let the app use an existing server's models.
+        _embedding_dimension = int(
+            os.environ.get(
+                "EMBEDDING_DIMENSION",
+                _config["vector_db"].get("embedding_dimension")
+                or DEFAULT_EMBEDDING_DIMENSION,
+            )
         )
-        _embedding_model = (
-            _config["vector_db"].get("embedding_model")
-            if _config["vector_db"].get("embedding_model")
-            else DEFAULT_EMBEDDING_MODEL
+        _embedding_model = os.environ.get(
+            "EMBEDDING_MODEL",
+            _config["vector_db"].get("embedding_model") or DEFAULT_EMBEDDING_MODEL,
+        )
+        self.vector_db_provider_id = os.environ.get(
+            "VECTOR_DB_PROVIDER_ID", _config["vector_db"].get("provider_id", "")
         )
         _chunk_size_in_tokens = (
             _config["vector_db"].get("chunk_size_in_tokens")
@@ -609,9 +613,17 @@ class IngestionService:
             # asyncio.to_thread moves the synchronous OGX-client
             # call to a separate thread so the asyncio (event) loop keeps
             # running.
+            extra_body: dict[str, Any] = {
+                "embedding_model": self.vector_db_config.embedding_model,
+                "embedding_dimension": str(self.vector_db_config.embedding_dimension),
+            }
+            if self.vector_db_provider_id:
+                extra_body["provider_id"] = self.vector_db_provider_id
             vector_store = await asyncio.to_thread(
                 self.client.vector_stores.create,
-                CreateVectorStoreRequest(name=vector_store_name),
+                CreateVectorStoreRequest(
+                    name=vector_store_name, additional_properties=extra_body
+                ),
             )
             self.vector_store_ids.append(vector_store.id)
         except Exception as e:

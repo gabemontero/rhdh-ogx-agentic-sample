@@ -1,5 +1,39 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Literal
+
+
+class GuardrailResult(BaseModel):
+    """Validated safety verdict from a GPT classifier."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    flagged: bool
+    categories: list[
+        Literal[
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7",
+            "S8",
+            "S9",
+            "S10",
+            "S11",
+            "S12",
+            "S13",
+            "S14",
+        ]
+    ] = Field(description="Violated safety category codes; empty for safe input.")
+
+    @model_validator(mode="after")
+    def consistent_verdict(self) -> "GuardrailResult":
+        if self.flagged != bool(self.categories):
+            raise ValueError(
+                "Flagged verdicts require categories; safe verdicts must have none"
+            )
+        return self
 
 
 class ClassificationModel(BaseModel):

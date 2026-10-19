@@ -132,6 +132,42 @@ source .venv/bin/activate
 uv run python -c "from ogx_client import OgxClient; print(OgxClient(base_url='http://localhost:8321').models.list())"
 ```
 
+### Connect the app to an existing OGX server
+
+The OGX server can run remotely while the Streamlit app runs locally. From the
+repository root, prepare shell configuration:
+
+```bash
+cp config/sample-env .env.local
+# Edit .env.local with your server URL and registered model IDs.
+source .env.local
+uv run streamlit run streamlit_app.py
+```
+
+Run `uv sync` first if the app environment is not installed. `.env.local` is
+gitignored and must be sourced explicitly. Do not start the local OGX server
+when using the existing one. Use the server base URL, without a trailing `/v1`.
+
+`LLAMA_STACK_URL`, `INFERENCE_MODEL`, and `MCP_TOOL_MODEL` select the server and
+inference models. `EMBEDDING_MODEL` and `EMBEDDING_DIMENSION` override ingestion
+YAML settings and are sent when creating vector stores. `VECTOR_DB_PROVIDER_ID`
+optionally selects the server's vector-store provider. Existing populated stores
+are reused when their names match the enabled pipelines in the ingestion config;
+these settings do not change the embedding model of an existing store.
+
+Docling still converts PDFs in the app before uploading text to OGX. The remote
+server needs compatible text-file ingestion and embedding support, not Docling
+for this app-side conversion path. Certificate verification remains enabled;
+use a trusted certificate or configure the Python trust store for a private CA.
+
+Set `GUARDRAIL_MODE` and `GUARDRAIL_MODEL` to a compatible pair registered on the
+server; see [Safety / Guardrails](#safety--guardrails) for GPT configuration. The
+default mode is `llama_guard` and its default model is `ollama/llama-guard3:8b`.
+An empty model value does not disable guardrails. If reusing an older environment
+file that sets this variable empty, replace that setting before testing chat.
+The configured MCP server must also be reachable from the remote OGX server for
+Kubernetes tool calls.
+
 ## Run the application Code
 
 The snippet below for running the application assumes you are in the top directory of your clone of this repository.
@@ -253,4 +289,48 @@ but again without success.
 
 ## Safety / Guardrails
 
-This sample uses Llama Guard 3 for content safety and guardrails. OGX 1.2.5 no longer serves an OpenAI-compatible moderations endpoint, so the guardrail sends the text to the configured guard model (e.g. `ollama/llama-guard3:8b`) as a chat completion; Llama Guard replies with `safe` or `unsafe` followed by the violated hazard categories, which the application maps to human-readable names.
+OGX 1.2.5 no longer serves the OpenAI-compatible `/v1/moderations` endpoint.
+Both guardrail modes below use `/v1/chat/completions` instead, keeping model
+access on the same OGX server as inference and RAG. GPT mode performs safety
+classification through chat; it does not call the Moderations API. Select the
+protocol explicitly; changing the model name alone does not change its parser.
+
+The default uses a registered Llama Guard-compatible model. Llama Guard replies
+with `safe` or `unsafe`, followed by any violated S1–S14 hazard codes, which the
+application maps to human-readable category names:
+
+```bash
+export GUARDRAIL_MODE=llama_guard
+export GUARDRAIL_MODEL=ollama/llama-guard3:8b
+```
+
+To use a registered GPT model that supports structured chat output:
+
+```bash
+# Set these after sourcing your environment file so it cannot override them.
+export GUARDRAIL_MODE=gpt
+export GUARDRAIL_MODEL=openai/gpt-4.1-mini
+uv run streamlit run streamlit_app.py
+```
+
+Use the exact model ID listed by your OGX server. No separate OpenAI client
+endpoint or local Ollama connection is introduced. Restart Streamlit after
+changing environment variables.
+
+Model discovery alone does not prove generation works: the chosen OGX provider
+must have valid upstream credentials and support structured output. An HTTP 401
+from that provider must be resolved before GPT guardrail calls can succeed.
+
+GPT mode sends a safety-classification policy as a system message and the user's
+input separately as untrusted text. It requires a strict structured verdict with
+`flagged` and `categories`, using the S1–S14 category codes described in
+`src/methods.py`. Safe results must have no categories; flagged results must have
+at least one. A flagged request stops before department routing or tool calls.
+Refusals, invalid responses, unsupported modes, and request failures stop the
+workflow with a safety-check error; they do not silently permit the request.
+
+The GPT policy allows ordinary workplace, policy, and authorized technical-support
+questions while screening for harmful requests. It is an application policy, not
+a claim of equivalent accuracy or identical behavior to Llama Guard. Evaluate it
+against representative inputs for your deployment. This check covers the initial
+user input; it does not add moderation of generated answers or tool results.

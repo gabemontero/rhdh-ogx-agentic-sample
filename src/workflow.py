@@ -306,6 +306,7 @@ class Workflow:
         git_token: "str | None" = None,
         guardrail_model: "str | None" = None,
         github_url: "str | None" = None,
+        guardrail_mode: str = "llama_guard",
     ):
         """Create and configure the overall workflow with all agents and routing.
 
@@ -319,6 +320,7 @@ class Workflow:
             git_token: GitHub personal access token for git agent MCP calls (optional)
             guardrail_model: Model name for content moderation/safety checks (optional)
             github_url: GitHub repository URL for creating issues (optional)
+            guardrail_mode: Safety classifier protocol: llama_guard or gpt.
         """
         # agents that make MCP tool calls need a model capable of tool loops;
         # fall back to tools_llm for backward compatibility
@@ -421,6 +423,7 @@ class Workflow:
                 openai_client=self.rag_service.openai_client,
                 topic_llm=tools_llm,
                 guardrail_model=guardrail_model,
+                guardrail_mode=guardrail_mode,
             )
 
         def support_classification_node(state: "WorkflowState") -> "WorkflowState":

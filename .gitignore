@@ -30,6 +30,7 @@ ENV/
 # Environment files
 .env
 .env.local
+config/private-env
 
 # OGX local data
 .llama/
