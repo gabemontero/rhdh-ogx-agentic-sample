@@ -2,7 +2,7 @@ name: CI/CD App, OGX Image Build and Push
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'ai-rolling-demo-**' ]
   release:
     types: [ published ]
 
@@ -63,9 +63,17 @@ jobs:
             echo "tags<<EOF" >> $GITHUB_OUTPUT
             echo "${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-          else
+          elif [ "${GITHUB_REF_NAME}" = "main" ]; then
             echo "tags<<EOF" >> $GITHUB_OUTPUT
             echo "latest" >> $GITHUB_OUTPUT
+            echo "${GITHUB_SHA}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            # ai-rolling-demo-X_Y -> rolling-demo-X.Y
+            TAG="${GITHUB_REF_NAME#ai-}"
+            TAG="${TAG//_/.}"
+            echo "tags<<EOF" >> $GITHUB_OUTPUT
+            echo "${TAG}" >> $GITHUB_OUTPUT
             echo "${GITHUB_SHA}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           fi
