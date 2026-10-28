@@ -444,7 +444,7 @@ class TestWorkflowIntegration:
         mock_openai_client = Mock()
 
         mock_completion = MagicMock()
-        mock_completion.choices = [Mock(message=Mock(content="Test response"))]
+        mock_completion.choices = [Mock(message=Mock(content="safe"))]
         mock_openai_client.chat.completions.create.return_value = mock_completion
 
         mock_parsed = Mock()
@@ -461,8 +461,8 @@ class TestWorkflowIntegration:
         )
 
         # Guardrail now runs the guard model via chat completions (OGX 1.2.5
-        # dropped /v1/moderations). The mock_completion above returns a non-unsafe
-        # string, so the guardrail treats the input as safe.
+        # dropped /v1/moderations). The mock_completion above returns the
+        # recognized "safe" verdict so classification can proceed.
 
         mock_rag_service.openai_client = mock_openai_client
         mock_rag_service.openai_client = mock_openai_client

@@ -111,7 +111,7 @@ def mock_openai_client():
     client = Mock()
 
     mock_completion = Mock()
-    mock_completion.choices = [Mock(message=Mock(content="Test response"))]
+    mock_completion.choices = [Mock(message=Mock(content="safe"))]
     client.chat.completions.create.return_value = mock_completion
 
     # Mock for classification - create a simple object with instance attributes

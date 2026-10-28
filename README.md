@@ -149,10 +149,13 @@ gitignored and must be sourced explicitly. Do not start the local OGX server
 when using the existing one. Use the server base URL, without a trailing `/v1`.
 
 `LLAMA_STACK_URL`, `INFERENCE_MODEL`, and `MCP_TOOL_MODEL` select the server and
-inference models. `EMBEDDING_MODEL` and `EMBEDDING_DIMENSION` override ingestion
-YAML settings and are sent when creating vector stores. `VECTOR_DB_PROVIDER_ID`
-optionally selects the server's vector-store provider. Existing populated stores
-are reused when their names match the enabled pipelines in the ingestion config;
+inference models. `EMBEDDING_MODEL` and `EMBEDDING_DIMENSION` are optional server
+overrides sent when creating vector stores. Each is sent only when its environment
+variable is set. A model-only override does not send the YAML's fallback dimension;
+OGX resolves the dimension from its configuration or registered model. With neither
+override, OGX uses its server defaults. `VECTOR_DB_PROVIDER_ID` optionally selects
+the server's vector-store provider. Existing populated stores are reused when
+their names match the enabled pipelines in the ingestion config;
 these settings do not change the embedding model of an existing store.
 
 Docling still converts PDFs in the app before uploading text to OGX. The remote
@@ -304,6 +307,10 @@ export GUARDRAIL_MODE=llama_guard
 export GUARDRAIL_MODEL=ollama/llama-guard3:8b
 ```
 
+Llama Guard mode accepts only `safe`, or `unsafe` followed by a line of recognized
+hazard codes. Empty replies, refusals, unexpected text, and malformed category
+lists stop processing with a safety-check error instead of being treated as safe.
+
 To use a registered GPT model that supports structured chat output:
 
 ```bash
@@ -326,8 +333,10 @@ input separately as untrusted text. It requires a strict structured verdict with
 `flagged` and `categories`, using the S1–S14 category codes described in
 `src/methods.py`. Safe results must have no categories; flagged results must have
 at least one. A flagged request stops before department routing or tool calls.
-Refusals, invalid responses, unsupported modes, and request failures stop the
-workflow with a safety-check error; they do not silently permit the request.
+In both modes, refusals, invalid responses, unsupported modes, and request failures
+stop the workflow with a safety-check error; they do not silently permit the request.
+Failure logs include the guardrail mode, model, and exception traceback; the UI
+keeps a generic error message.
 
 The GPT policy allows ordinary workplace, policy, and authorized technical-support
 questions while screening for harmful requests. It is an application policy, not

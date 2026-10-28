@@ -87,6 +87,15 @@ class IngestionService:
         self.vector_db_provider_id = os.environ.get(
             "VECTOR_DB_PROVIDER_ID", _config["vector_db"].get("provider_id", "")
         )
+        # Only explicit overrides belong in the server request. In particular,
+        # a model override must not inherit another model's YAML dimension.
+        self.vector_store_options: dict[str, Any] = {}
+        if os.environ.get("EMBEDDING_MODEL"):
+            self.vector_store_options["embedding_model"] = _embedding_model
+        if os.environ.get("EMBEDDING_DIMENSION"):
+            self.vector_store_options["embedding_dimension"] = str(_embedding_dimension)
+        if self.vector_db_provider_id:
+            self.vector_store_options["provider_id"] = self.vector_db_provider_id
         _chunk_size_in_tokens = (
             _config["vector_db"].get("chunk_size_in_tokens")
             if _config["vector_db"].get("chunk_size_in_tokens")
@@ -613,16 +622,11 @@ class IngestionService:
             # asyncio.to_thread moves the synchronous OGX-client
             # call to a separate thread so the asyncio (event) loop keeps
             # running.
-            extra_body: dict[str, Any] = {
-                "embedding_model": self.vector_db_config.embedding_model,
-                "embedding_dimension": str(self.vector_db_config.embedding_dimension),
-            }
-            if self.vector_db_provider_id:
-                extra_body["provider_id"] = self.vector_db_provider_id
             vector_store = await asyncio.to_thread(
                 self.client.vector_stores.create,
                 CreateVectorStoreRequest(
-                    name=vector_store_name, additional_properties=extra_body
+                    name=vector_store_name,
+                    additional_properties=self.vector_store_options,
                 ),
             )
             self.vector_store_ids.append(vector_store.id)

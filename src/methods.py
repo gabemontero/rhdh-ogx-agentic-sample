@@ -109,16 +109,16 @@ def run_guardrail(
         messages=guard_messages,
     )
     verdict = (guard_completion.choices[0].message.content or "").strip()
-    if not verdict.lower().startswith("unsafe"):
+    lines = verdict.splitlines()
+    if len(lines) == 1 and lines[0].strip().lower() == "safe":
         return False, []
 
-    # The line after "unsafe" lists the violated S-codes, if any.
-    codes_line = verdict.split("\n", 1)[1].strip() if "\n" in verdict else ""
-    categories = [
-        LLAMA_GUARD_CATEGORIES.get(code.strip(), code.strip())
-        for code in codes_line.split(",")
-        if code.strip()
-    ]
+    if len(lines) != 2 or lines[0].strip().lower() != "unsafe":
+        raise ValueError("Llama Guard did not provide a recognized safety verdict")
+    codes = [code.strip().upper() for code in lines[1].split(",")]
+    if any(code not in LLAMA_GUARD_CATEGORIES for code in codes):
+        raise ValueError("Llama Guard returned invalid hazard category codes")
+    categories = [LLAMA_GUARD_CATEGORIES[code] for code in codes]
     return True, categories
 
 
@@ -166,8 +166,12 @@ def classification_agent(
         flagged, flagged_categories = run_guardrail(
             openai_client, guardrail_model, str(state["input"]), mode=guardrail_mode
         )
-    except Exception as e:
-        logger.error(f"Guardrail check failed: {e}")
+    except Exception:
+        logger.exception(
+            "Guardrail check failed (mode=%s, model=%s)",
+            guardrail_mode,
+            guardrail_model,
+        )
         state["decision"] = "unknown"
         state["data"] = state["input"]
         state["classification_message"] = (

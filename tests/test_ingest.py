@@ -414,10 +414,19 @@ class TestCreateVectorDb:
         [
             (
                 {},
-                {
-                    "embedding_model": "text-embedding-ada-002",
-                    "embedding_dimension": "1536",
-                },
+                {},
+            ),
+            (
+                {"EMBEDDING_MODEL": "openai/text-embedding-3-small"},
+                {"embedding_model": "openai/text-embedding-3-small"},
+            ),
+            (
+                {"EMBEDDING_DIMENSION": "768"},
+                {"embedding_dimension": "768"},
+            ),
+            (
+                {"VECTOR_DB_PROVIDER_ID": "faiss"},
+                {"provider_id": "faiss"},
             ),
             (
                 {

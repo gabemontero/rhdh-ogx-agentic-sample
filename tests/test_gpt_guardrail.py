@@ -1,4 +1,4 @@
-"""Exercise the GPT guardrail through the real OpenAI SDK with fake HTTP."""
+"""Exercise both guardrail protocols through the real OpenAI SDK with fake HTTP."""
 
 import json
 
@@ -92,6 +92,7 @@ def test_failed_gpt_check_stops_before_topic_classification(
     verdict,
     refusal,
     status,
+    caplog,
 ):
     client, requests = classifier_client(verdict, refusal=refusal, status=status)
     with client:
@@ -106,6 +107,11 @@ def test_failed_gpt_check_stops_before_topic_classification(
     assert state["workflow_complete"] is True
     assert "safety check" in state["classification_message"].lower()
     assert [r["model"] for r in requests] == ["guard-model"]
+    errors = [r for r in caplog.records if "Guardrail check failed" in r.getMessage()]
+    assert len(errors) == 1
+    assert errors[0].exc_info is not None
+    assert "gpt" in errors[0].getMessage()
+    assert "guard-model" in errors[0].getMessage()
 
 
 def test_unknown_guardrail_mode_stops_without_model_calls(sample_workflow_state):
@@ -156,3 +162,66 @@ def test_workflow_passes_gpt_mode_to_classification(sample_workflow_state):
     assert state["decision"] == "unsafe"
     assert state["workflow_complete"] is True
     assert requests[0]["response_format"]["type"] == "json_schema"
+
+
+@pytest.mark.parametrize(
+    "verdict",
+    [
+        "",
+        "I cannot help with that request.",
+        '{"flagged": true, "categories": ["S2"]}',
+        "safely",
+        "unsafe content",
+        "safe\nS1",
+        "unsafe",
+        "unsafe\nS999",
+        "unsafe\nS1,",
+        "unsafe\nS1\nextra text",
+    ],
+)
+def test_malformed_llama_guard_reply_stops_routing(sample_workflow_state, verdict):
+    client, requests = classifier_client(verdict)
+    with client:
+        state = classification_agent(
+            sample_workflow_state,
+            client,
+            "topic-model",
+            "guard-model",
+            guardrail_mode="llama_guard",
+        )
+    assert state["decision"] == "unknown"
+    assert state["workflow_complete"] is True
+    assert "safety check" in state["classification_message"].lower()
+    assert [r["model"] for r in requests] == ["guard-model"]
+
+
+@pytest.mark.parametrize(
+    "verdict,decision",
+    [
+        ("safe", "legal"),
+        (" SAFE\n", "legal"),
+        ("unsafe\nS1,S7", "unsafe"),
+        ("UNSAFE\r\nS7", "unsafe"),
+    ],
+)
+def test_recognized_llama_guard_reply_controls_routing(
+    sample_workflow_state,
+    verdict,
+    decision,
+):
+    client, requests = classifier_client(verdict)
+    with client:
+        state = classification_agent(
+            sample_workflow_state,
+            client,
+            "topic-model",
+            "guard-model",
+            guardrail_mode="llama_guard",
+        )
+    assert state["decision"] == decision
+    if decision == "unsafe":
+        assert "Privacy" in state["classification_message"]
+        assert state["workflow_complete"] is True
+        assert [r["model"] for r in requests] == ["guard-model"]
+    else:
+        assert [r["model"] for r in requests] == ["guard-model", "topic-model"]
