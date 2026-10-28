@@ -409,6 +409,62 @@ class TestCreateVectorDb:
     """
 
     @pytest.mark.anyio
+    @pytest.mark.parametrize(
+        "overrides, expected",
+        [
+            (
+                {},
+                {},
+            ),
+            (
+                {"EMBEDDING_MODEL": "openai/text-embedding-3-small"},
+                {"embedding_model": "openai/text-embedding-3-small"},
+            ),
+            (
+                {"EMBEDDING_DIMENSION": "768"},
+                {"embedding_dimension": "768"},
+            ),
+            (
+                {"VECTOR_DB_PROVIDER_ID": "faiss"},
+                {"provider_id": "faiss"},
+            ),
+            (
+                {
+                    "EMBEDDING_MODEL": "remote/embedding",
+                    "EMBEDDING_DIMENSION": "768",
+                    "VECTOR_DB_PROVIDER_ID": "faiss",
+                },
+                {
+                    "embedding_model": "remote/embedding",
+                    "embedding_dimension": "768",
+                    "provider_id": "faiss",
+                },
+            ),
+        ],
+    )
+    async def test_create_vector_db_sends_configured_embedding_settings(
+        self,
+        sample_config_file,
+        mock_ogx_client,
+        mock_ogx_availability,
+        monkeypatch,
+        overrides,
+        expected,
+    ):
+        for name in ["EMBEDDING_MODEL", "EMBEDDING_DIMENSION", "VECTOR_DB_PROVIDER_ID"]:
+            monkeypatch.delenv(name, raising=False)
+        for name, value in overrides.items():
+            monkeypatch.setenv(name, value)
+        with patch("src.ingest.OgxClient", return_value=mock_ogx_client):
+            service = IngestionService(sample_config_file)
+
+        result = await service.create_vector_db("test-vector-db", [Mock(id="doc-id")])
+
+        assert result is True
+        request = mock_ogx_client.vector_stores.create.call_args.args[0]
+        assert request.to_dict() == {"name": "test-vector-db", **expected}
+
+    @pytest.mark.anyio
     async def test_create_vector_db_success(
         self, sample_config_file, mock_ogx_client, mock_ogx_availability
     ):

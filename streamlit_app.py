@@ -43,6 +43,7 @@ INFERENCE_MODEL = os.getenv("INFERENCE_MODEL", DEFAULT_INFERENCE_MODEL)
 
 # GUARDRAIL_MODEL: Model to use for guardrails
 GUARDRAIL_MODEL = os.getenv("GUARDRAIL_MODEL", DEFAULT_GUARDRAIL_MODEL)
+GUARDRAIL_MODE = os.getenv("GUARDRAIL_MODE", "llama_guard")
 
 # MCP_TOOL_MODEL: Model to use for MCP tool calls
 MCP_TOOL_MODEL = os.getenv("MCP_TOOL_MODEL", DEFAULT_MCP_TOOL_MODEL)
@@ -141,6 +142,7 @@ def initialize_workflow(_pipelines: "list[Pipeline]") -> "tuple[Any, RAGService]
         git_token=GITHUB_TOKEN,
         github_url=GITHUB_URL,
         guardrail_model=GUARDRAIL_MODEL,
+        guardrail_mode=GUARDRAIL_MODE,
     )
 
     logger.info("✓ Workflow and RAG Service initialized and cached")
@@ -855,6 +857,7 @@ def main() -> "None":
 
         st.markdown(f"**Inference Model:** `{INFERENCE_MODEL}`")
         st.markdown(f"**Guardrail Model:** `{GUARDRAIL_MODEL}`")
+        st.markdown(f"**Guardrail Mode:** `{GUARDRAIL_MODE}`")
         st.markdown(f"**MCP Tool Model:** `{MCP_TOOL_MODEL}`")
         st.divider()
 

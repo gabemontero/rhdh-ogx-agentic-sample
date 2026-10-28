@@ -285,10 +285,6 @@ class RAGService:
         initializes the OGX client and load vector stores.
         """
         try:
-            self.client = OgxClient(base_url=self.llama_stack_url)
-            self.client.models.list()
-            logger.info("RAG Service: OGX client initialized successfully")
-
             # Initialize OpenAI client for structured output
             # (points to LlamaStack's OpenAI-compatible endpoint)
             openai_base_url = f"{self.llama_stack_url}/v1"
@@ -299,6 +295,12 @@ class RAGService:
             logger.info(
                 f"RAG Service: OpenAI client initialized (base_url={openai_base_url})"
             )
+
+            # Construct OpenAI first: initializing it after an OGX HTTPS request
+            # can cause an SSL error on the next request over that connection.
+            self.client = OgxClient(base_url=self.llama_stack_url)
+            self.client.models.list()
+            logger.info("RAG Service: OGX client initialized successfully")
 
             return self.load_vector_stores()
         except Exception as e:
