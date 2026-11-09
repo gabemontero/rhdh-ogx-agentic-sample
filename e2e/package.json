@@ -12,7 +12,7 @@
     "@kubernetes/client-node": "^1.4.0",
     "@octokit/rest": "^22.0.1",
     "@types/node": "^25.1.0",
-    "axios": "^1.13.4",
+    "axios": "^1.20.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
